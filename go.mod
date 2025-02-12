@@ -1,4 +1,4 @@
-module ZMQ_pkg
+module zmq_practice
 
 go 1.23.5
 
