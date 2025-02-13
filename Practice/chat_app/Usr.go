@@ -28,18 +28,17 @@ func recieve_msg(context *zmt.Context, name_channel chan string) {
 	name_channel <- name
 
 	// Subscribe to self and broadcst
-	reciever.SetSubscribe(name)
-	reciever.SetSubscribe("broadcast")
+	reciever.SetSubscribe("@" + name)
+	reciever.SetSubscribe("@all")
 	for {
 		message, _ := reciever.Recv(0)
-		message = strings.TrimSuffix(message, "\n")
 
 		// Parse the message
 		message_split := strings.Split(message, " ")
 		_, sender_name, extracted_message := message_split[0], message_split[1], strings.Join(message_split[2:], " ")
 
 		if sender_name != name {
-			fmt.Printf("\n\nFrom %s: %s\n", sender_name, extracted_message)
+			fmt.Printf("\nFrom %s: %s\n", sender_name, extracted_message)
 		}
 	}
 }
@@ -47,7 +46,6 @@ func recieve_msg(context *zmt.Context, name_channel chan string) {
 // Just hava ma try karu chu
 
 func main() {
-
 	context, _ := zmt.NewContext()
 	defer context.Term()
 
@@ -63,15 +61,19 @@ func main() {
 	//wait for the slef declaration
 	self_name := <-name_channel
 	for {
-		fmt.Printf("Enter reciever name: ")
-		reciever_name, _ := reader.ReadString('\n')
-		reciever_name = strings.TrimSuffix(reciever_name, "\n")
+		// fmt.Printf("Enter reciever name: ")
+		// reciever_name, _ := reader.ReadString('\n')
+		// reciever_name = strings.TrimSuffix(reciever_name, "\n")
 
 		fmt.Printf("Enter message: ")
 		msg, _ := reader.ReadString('\n')
 		msg = strings.TrimSuffix(msg, "\n")
 
-		server_snd.Send(fmt.Sprintf("%s %s %s", reciever_name, self_name, msg), 0)
+		if strings.HasPrefix(msg, "@") {
+			server_snd.Send(fmt.Sprintf("%s %s", self_name, msg), 0)
+		} else {
+			fmt.Println("Please mention the reciepent with '@' at the beigining.")
+		}
 
 	}
 

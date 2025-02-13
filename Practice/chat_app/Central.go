@@ -33,12 +33,13 @@ func main() {
 
 		// parse the msg and extract the topic. msg formt: "topic msg"
 		msg_split := strings.Split(msg, " ")
-		topic, msg_actual := msg_split[0], strings.Join(msg_split[1:], " ")
+		sender_name, topic, msg_actual := msg_split[0], msg_split[1], strings.Join(msg_split[2:], " ")
 
 		// fmt.Printf("%s : %s", topic, msg_actual)
 
 		// Publish to that topic
-		publisher.Send(fmt.Sprintf("%s %s", topic, msg_actual), 0)
+		publisher.Send(fmt.Sprintf("%s %s %s", topic, sender_name, msg_actual), 0)
+
 	}
 
 }
