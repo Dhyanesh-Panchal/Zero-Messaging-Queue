@@ -19,13 +19,13 @@ func main() {
 	reciever, _ := context.NewSocket(zmt.PULL)
 	defer reciever.Close()
 	// bind at port 5001
-	reciever.Bind("tcp://*:5001")
+	reciever.Bind("tcp://10.20.40.165:5001")
 
 	// Publisher socket
 	publisher, _ := context.NewSocket(zmt.PUB)
 	defer publisher.Close()
 	// bind at port 5002
-	publisher.Bind("tcp://*:5002")
+	publisher.Bind("tcp://10.20.40.165:5002")
 
 	// singular reciever-publisher
 	for {
