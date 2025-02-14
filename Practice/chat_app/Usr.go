@@ -28,8 +28,8 @@ func recieve_msg(context *zmt.Context, name_channel chan string) {
 	name_channel <- name
 
 	// Subscribe to self and broadcst
-	reciever.SetSubscribe("@" + name)
-	reciever.SetSubscribe("@all")
+	reciever.SetSubscribe("@" + name + "^")
+	reciever.SetSubscribe("@all^")
 	for {
 		message, _ := reciever.Recv(0)
 
