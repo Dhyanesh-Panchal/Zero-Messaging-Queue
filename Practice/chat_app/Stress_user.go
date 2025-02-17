@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	zmt "github.com/pebbe/zmq4"
 )
@@ -20,9 +21,10 @@ var reciever_ready int = 0
 // var reader = bufio.NewReader(os.Stdin)
 
 func recieve_msg(context *zmt.Context, self_name string) {
-
 	// Subscriber socket connected to central server's 5002 port
 	reciever, _ := context.NewSocket(zmt.SUB)
+	reciever.SetLinger(time.Second)
+	reciever.SetRcvhwm(5)
 	defer reciever.Close()
 	reciever.Connect(fmt.Sprintf("tcp://%s:5002", SERVER_IP))
 
@@ -34,22 +36,23 @@ func recieve_msg(context *zmt.Context, self_name string) {
 
 	// Reciever ready increament the global state.
 	reciever_ready++
-
 	for {
-		// message, _ := reciever.Recv(0)
+
 		_, err_rcv := reciever.Recv(0)
-		fmt.Printf("\nIN RECIEVER")
+		// fmt.Printf("\n Recieved: %s", message)
 		if err_rcv == nil {
 			recieve_counter++
+		} else {
+			fmt.Println("ERROR")
 		}
 		// Parse the message
 		// message_split := strings.Split(message, " ")
 		// _, sender_name, extracted_message := message_split[0], message_split[1], strings.Join(message_split[2:], " ")
-		fmt.Printf("\t Reciever %s \n ", self_name)
 
-		if recieve_counter%1 == 0 {
+		if recieve_counter%50 == 0 {
 			fmt.Printf("\n %s Recieved %d messages", self_name, recieve_counter)
 		}
+		// time.Sleep(100 * time.Millisecond)
 	}
 }
 
@@ -60,6 +63,7 @@ func User(user_id int, total_users int, message_count int) {
 
 	// Message pushing socket connected to server at port 5001
 	server_snd, _ := context.NewSocket(zmt.PUSH)
+	server_snd.SetLinger(time.Second) // Linger for 1 sec
 	defer server_snd.Close()
 	err := server_snd.Connect(fmt.Sprintf("tcp://%s:5001", SERVER_IP))
 
@@ -79,14 +83,15 @@ func User(user_id int, total_users int, message_count int) {
 		// fmt.Printf("\nName: %s ", self_name)
 		recieve_msg(context, self_name)
 	}()
-	// Wait untill all recievers ready
+	// // Wait untill all recievers ready
 	for reciever_ready < total_users {
 		// Wait.
 	}
-
 	// start Sending periodic messages.
+	fmt.Printf("\nSend started for %d, reciver ready count is: %d", user_id, reciever_ready)
 	for i := 0; i < message_count; i++ {
 		for target_user := 0; target_user < total_users; target_user++ {
+			// time.Sleep(time.Millisecond)
 			if target_user == user_id {
 				continue
 			}
@@ -120,10 +125,8 @@ func main() {
 	for i := 0; i < n_users; i++ {
 		wg.Add(1) // Add one more routine to the waitgroup.
 
-		fmt.Printf("\nOut: %d ", i)
 		go func(user_id int) {
 			defer wg.Done()
-			fmt.Printf("\nIn: %d ", user_id)
 			User(user_id, n_users, n_msgs)
 		}(i)
 	}
