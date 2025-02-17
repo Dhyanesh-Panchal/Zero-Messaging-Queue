@@ -8,15 +8,19 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"sync"
 
 	zmt "github.com/pebbe/zmq4"
 )
 
 const SERVER_IP string = "10.20.40.165"
 
+var reciever_ready int = 0
+
 // var reader = bufio.NewReader(os.Stdin)
 
-func recieve_msg(context *zmt.Context, self_name string, reciever_sync chan bool) {
+func recieve_msg(context *zmt.Context, self_name string) {
+
 	// Subscriber socket connected to central server's 5002 port
 	reciever, _ := context.NewSocket(zmt.SUB)
 	defer reciever.Close()
@@ -27,10 +31,17 @@ func recieve_msg(context *zmt.Context, self_name string, reciever_sync chan bool
 	reciever.SetSubscribe("@all^")
 
 	recieve_counter := 0
+
+	// Reciever ready increament the global state.
+	reciever_ready++
+
 	for {
 		// message, _ := reciever.Recv(0)
-		reciever.Recv(0)
-		recieve_counter++
+		_, err_rcv := reciever.Recv(0)
+		fmt.Printf("\nIN RECIEVER")
+		if err_rcv == nil {
+			recieve_counter++
+		}
 		// Parse the message
 		// message_split := strings.Split(message, " ")
 		// _, sender_name, extracted_message := message_split[0], message_split[1], strings.Join(message_split[2:], " ")
@@ -40,11 +51,10 @@ func recieve_msg(context *zmt.Context, self_name string, reciever_sync chan bool
 			fmt.Printf("\n %s Recieved %d messages", self_name, recieve_counter)
 		}
 	}
-	reciever_sync <- true
 }
 
 // User method
-func User(user_id int, total_users int, message_count int, sync chan bool) {
+func User(user_id int, total_users int, message_count int) {
 	context, _ := zmt.NewContext()
 	defer context.Term()
 
@@ -56,12 +66,23 @@ func User(user_id int, total_users int, message_count int, sync chan bool) {
 	if err != nil {
 		fmt.Printf("Error Connecting to server for user %d", user_id)
 	}
+	// fmt.Printf("\nName: %d ", user_id)
 	self_name := strconv.Itoa(user_id)
-	// fmt.Printf("Name: %s ", self_name)
 
-	reciever_sync := make(chan bool)
 	// start a go routine for listening to published message
-	go recieve_msg(context, self_name, reciever_sync)
+	var wg_reciver sync.WaitGroup
+	wg_reciver.Add(1)
+
+	// Use channel to synchronise with the reciever
+	go func() {
+		defer wg_reciver.Done()
+		// fmt.Printf("\nName: %s ", self_name)
+		recieve_msg(context, self_name)
+	}()
+	// Wait untill all recievers ready
+	for reciever_ready < total_users {
+		// Wait.
+	}
 
 	// start Sending periodic messages.
 	for i := 0; i < message_count; i++ {
@@ -69,7 +90,7 @@ func User(user_id int, total_users int, message_count int, sync chan bool) {
 			if target_user == user_id {
 				continue
 			}
-			fmt.Printf("\t %d \n ", user_id)
+			// fmt.Printf("\t %d \n ", user_id)
 			msg := fmt.Sprintf("THIS IS MESSAGE %d FROM %s", i+1, self_name)
 
 			// // Increament target user
@@ -83,8 +104,7 @@ func User(user_id int, total_users int, message_count int, sync chan bool) {
 			server_snd.Send(fmt.Sprintf("%s @%s %s", self_name, strconv.Itoa(target_user), msg), 0)
 		}
 	}
-	<-reciever_sync
-	sync <- true
+	wg_reciver.Wait()
 
 }
 
@@ -93,10 +113,20 @@ func main() {
 	n_users, _ := strconv.Atoi(os.Args[1])
 	n_msgs, _ := strconv.Atoi(os.Args[2])
 
-	sync := make(chan bool)
+	var wg sync.WaitGroup
+
+	// A reciever ready shared variable to aware the Users of ready recievers.
 	//Instanciate Users routines
 	for i := 0; i < n_users; i++ {
-		go User(i, n_users, n_msgs, sync)
+		wg.Add(1) // Add one more routine to the waitgroup.
+
+		fmt.Printf("\nOut: %d ", i)
+		go func(user_id int) {
+			defer wg.Done()
+			fmt.Printf("\nIn: %d ", user_id)
+			User(user_id, n_users, n_msgs)
+		}(i)
 	}
-	<-sync
+
+	wg.Wait()
 }
