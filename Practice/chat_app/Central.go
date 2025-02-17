@@ -30,23 +30,31 @@ func main() {
 
 	// singular reciever-publisher
 
-	message_count := 0
+	rcv_message_count := 0
+	snd_message_count := 0
 	snapshot_time := time.Now()
 	for {
-		msg, _ := reciever.Recv(0)
-		message_count++
+		msg, err_rcv := reciever.Recv(0)
+		if err_rcv == nil {
+			rcv_message_count++
+		}
 		// parse the msg and extract the topic. msg formt: "topic msg"
 		msg_split := strings.Split(msg, " ")
 		sender_name, topic, msg_actual := msg_split[0], msg_split[1], strings.Join(msg_split[2:], " ")
 
-		// fmt.Printf("\n%s --> %s : %s", sender_name, topic, msg_actual)
+		fmt.Printf("\n%s --> %s : %s", sender_name, topic, msg_actual)
 
 		// Publish to that topic
-		publisher.Send(fmt.Sprintf("%s^ %s %s", topic, sender_name, msg_actual), 0)
+		_, err_snd := publisher.Send(fmt.Sprintf("%s^ %s %s", topic, sender_name, msg_actual), 0)
+		if err_snd == nil {
+			snd_message_count++
+		}
 
-		if message_count%1000 == 0 {
+		const snapshot_length = 1
+
+		if rcv_message_count%snapshot_length == 0 || snd_message_count%snapshot_length == 0 {
 			elapsed_time := time.Since(snapshot_time)
-			fmt.Printf("\nSent %d messages in %d ms", message_count, elapsed_time.Milliseconds())
+			fmt.Printf("\nRecieved: %d, Sent: %d messages in %d ms", rcv_message_count, snd_message_count, elapsed_time.Milliseconds())
 			snapshot_time = time.Now()
 		}
 
