@@ -3,30 +3,66 @@ package main
 import (
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
-	zmt "github.com/pebbe/zmq4"
+	zmq "github.com/pebbe/zmq4"
 )
 
-// func recieve_msg(reciever *zmt.Socket)
+var User_list = make(map[string]bool)
 
-// Just hava ma try karu chu
+func Handle_new_usr(context *zmq.Context) {
+	soc, _ := context.NewSocket(zmq.REP)
+	defer soc.Close()
+
+	soc.Bind("tcp://*:5003")
+	for {
+		user_name, _ := soc.Recv(0)
+
+		// Verify that name isnt duplicate
+		if User_list[user_name] == false {
+			// user_name unique, update the list
+			User_list[user_name] = true
+			// Replay back with OK
+			soc.Send("OK", 0)
+		} else {
+			// User already exist
+			soc.Send("USER_ALREADY_EXIST", 0)
+		}
+
+	}
+
+}
 
 func main() {
-	context, _ := zmt.NewContext()
+
+	var wg sync.WaitGroup
+
+	context, _ := zmq.NewContext()
 	defer context.Term()
 
 	// Reciever socket
-	reciever, _ := context.NewSocket(zmt.PULL)
+	reciever, _ := context.NewSocket(zmq.PULL)
+	reciever.SetLinger(time.Second)
+
 	defer reciever.Close()
 	// bind at port 5001
 	reciever.Bind("tcp://*:5001")
 
 	// Publisher socket
-	publisher, _ := context.NewSocket(zmt.PUB)
+	publisher, _ := context.NewSocket(zmq.PUB)
+	publisher.SetLinger(time.Second)
+
 	defer publisher.Close()
 	// bind at port 5002
 	publisher.Bind("tcp://*:5002")
+
+	// Instanciate User Name Verification routine
+	wg.Add(1)
+	go func(context *zmq.Context) {
+		defer wg.Done()
+		Handle_new_usr(context)
+	}(context)
 
 	// singular reciever-publisher
 
@@ -50,7 +86,7 @@ func main() {
 			snd_message_count++
 		}
 
-		const snapshot_length = 1
+		const snapshot_length = 10
 
 		if rcv_message_count%snapshot_length == 0 || snd_message_count%snapshot_length == 0 {
 			elapsed_time := time.Since(snapshot_time)
