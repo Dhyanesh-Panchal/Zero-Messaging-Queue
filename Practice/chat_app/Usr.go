@@ -4,12 +4,13 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 
 	zmq "github.com/pebbe/zmq4"
 )
 
-const SERVER_IP string = "10.20.40.165"
+var SERVER_IP string = "10.20.40.165"
 
 var reader = bufio.NewReader(os.Stdin)
 
@@ -63,6 +64,20 @@ func recieve_msg(context *zmq.Context, name_channel chan string) {
 // Just hava ma try karu chu
 
 func main() {
+	// Parse Arguments if any.
+	if len(os.Args) > 1 {
+		// Get Server IP in args
+		input_server_IP := os.Args[1]
+
+		// Validate the IP format
+		valid_IP, _ := regexp.MatchString(`([1-9]?[0-9]?[0-9]?\.[1-9]?[0-9]?[0-9]?\.[1-9]?[0-9]?[0-9]?\.[1-9]?[0-9]?[0-9])`, input_server_IP)
+		if valid_IP {
+			SERVER_IP = input_server_IP
+		} else {
+			fmt.Printf("\nInvalid IP address, using default: %s", SERVER_IP)
+		}
+	}
+
 	context, _ := zmq.NewContext()
 	defer context.Term()
 
