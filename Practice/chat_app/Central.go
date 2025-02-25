@@ -9,91 +9,88 @@ import (
 	zmq "github.com/pebbe/zmq4"
 )
 
-var User_list = make(map[string]bool)
+var userList = make(map[string]bool)
 
-func Handle_new_usr(context *zmq.Context) {
-	soc, _ := context.NewSocket(zmq.REP)
-	defer soc.Close()
+func handleNewUser(zmqContext *zmq.Context) {
+	socket, _ := zmqContext.NewSocket(zmq.REP)
+	defer socket.Close()
 
-	soc.Bind("tcp://*:5003")
+	socket.Bind("tcp://*:5003")
 	for {
-		user_name, _ := soc.Recv(0)
+		userName, _ := socket.Recv(0)
 
-		// Verify that name isnt duplicate
-		if User_list[user_name] == false {
-			// user_name unique, update the list
-			User_list[user_name] = true
-			// Replay back with OK
-			soc.Send("OK", 0)
+		// Verify that name isn't duplicate
+		if !userList[userName] {
+			// userName is unique, update the list
+			userList[userName] = true
+			// Reply back with OK
+			socket.Send("OK", 0)
+			fmt.Printf("\n\tNEW USER JOINED: %s", userName)
 		} else {
-			// User already exist
-			soc.Send("USER_ALREADY_EXIST", 0)
+			// User already exists
+			socket.Send("USER_ALREADY_EXIST", 0)
 		}
-
 	}
-
 }
 
 func main() {
-
 	var wg sync.WaitGroup
 
-	context, _ := zmq.NewContext()
-	defer context.Term()
+	zmqContext, _ := zmq.NewContext()
+	defer zmqContext.Term()
 
-	// Reciever socket
-	reciever, _ := context.NewSocket(zmq.PULL)
-	reciever.SetLinger(time.Second)
+	// Receiver socket
+	receiver, _ := zmqContext.NewSocket(zmq.PULL)
+	receiver.SetLinger(time.Second)
+	defer receiver.Close()
 
-	defer reciever.Close()
-	// bind at port 5001
-	reciever.Bind("tcp://*:5001")
+	// Bind at port 5001
+	receiver.Bind("tcp://*:5001")
 
 	// Publisher socket
-	publisher, _ := context.NewSocket(zmq.PUB)
+	publisher, _ := zmqContext.NewSocket(zmq.PUB)
 	publisher.SetLinger(time.Second)
-
 	defer publisher.Close()
-	// bind at port 5002
+
+	// Bind at port 5002
 	publisher.Bind("tcp://*:5002")
 
-	// Instanciate User Name Verification routine
+	// Instantiate User Name Verification routine
 	wg.Add(1)
-	go func(context *zmq.Context) {
+	go func(zmqContext *zmq.Context) {
 		defer wg.Done()
-		Handle_new_usr(context)
-	}(context)
+		handleNewUser(zmqContext)
+	}(zmqContext)
 
-	// singular reciever-publisher
+	// Singular receiver-publisher
+	rcvMessageCount := 0
+	sndMessageCount := 0
+	snapshotTime := time.Now()
 
-	rcv_message_count := 0
-	snd_message_count := 0
-	snapshot_time := time.Now()
 	for {
-		msg, err_rcv := reciever.Recv(0)
-		if err_rcv == nil {
-			rcv_message_count++
+		msg, errRcv := receiver.Recv(0)
+		if errRcv == nil {
+			rcvMessageCount++
 		}
-		// parse the msg and extract the topic. msg formt: "topic msg"
-		msg_split := strings.Split(msg, " ")
-		sender_name, topic, msg_actual := msg_split[0], msg_split[1], strings.Join(msg_split[2:], " ")
 
-		fmt.Printf("\n%s --> %s : %s", sender_name, topic, msg_actual)
+		// Parse the msg and extract the topic. msg format: "topic msg"
+		msgSplit := strings.Split(msg, " ")
+		senderName, topic, msgContent := msgSplit[0], msgSplit[1], strings.Join(msgSplit[2:], " ")
+
+		fmt.Printf("\n%s --> %s : %s", senderName, topic, msgContent)
 
 		// Publish to that topic
-		_, err_snd := publisher.Send(fmt.Sprintf("%s^ %s %s", topic, sender_name, msg_actual), 0)
-		if err_snd == nil {
-			snd_message_count++
+		_, errSnd := publisher.Send(fmt.Sprintf("%s^ %s %s", topic, senderName, msgContent), 0)
+		if errSnd == nil {
+			sndMessageCount++
 		}
 
-		const snapshot_length = 10
+		const snapshotLength = 10
 
-		if rcv_message_count%snapshot_length == 0 || snd_message_count%snapshot_length == 0 {
-			elapsed_time := time.Since(snapshot_time)
-			fmt.Printf("\nRecieved: %d, Sent: %d messages in %d ms", rcv_message_count, snd_message_count, elapsed_time.Milliseconds())
-			snapshot_time = time.Now()
+		if rcvMessageCount%snapshotLength == 0 || sndMessageCount%snapshotLength == 0 {
+			elapsedTime := time.Since(snapshotTime)
+			fmt.Printf("\nReceived: %d, Sent: %d messages in %d ms", rcvMessageCount, sndMessageCount, elapsedTime.Milliseconds())
+			snapshotTime = time.Now()
 		}
-
 	}
-
 }

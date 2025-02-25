@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	zmt "github.com/pebbe/zmq4"
+	zmq "github.com/pebbe/zmq4"
 )
 
 const SERVER_IP string = "10.20.40.165"
@@ -20,11 +20,11 @@ var reciever_ready int = 0
 
 // var reader = bufio.NewReader(os.Stdin)
 
-func recieve_msg(context *zmt.Context, self_name string) {
+func recieve_msg(context *zmq.Context, self_name string) {
 	// Subscriber socket connected to central server's 5002 port
-	reciever, _ := context.NewSocket(zmt.SUB)
-	reciever.SetLinger(time.Second)
-	reciever.SetRcvhwm(5)
+	reciever, _ := context.NewSocket(zmq.SUB)
+	reciever.SetLinger(1)
+	reciever.SetRcvhwm(50)
 	defer reciever.Close()
 	reciever.Connect(fmt.Sprintf("tcp://%s:5002", SERVER_IP))
 
@@ -52,17 +52,16 @@ func recieve_msg(context *zmt.Context, self_name string) {
 		if recieve_counter%50 == 0 {
 			fmt.Printf("\n %s Recieved %d messages", self_name, recieve_counter)
 		}
-		// time.Sleep(100 * time.Millisecond)
 	}
 }
 
 // User method
 func User(user_id int, total_users int, message_count int) {
-	context, _ := zmt.NewContext()
+	context, _ := zmq.NewContext()
 	defer context.Term()
 
 	// Message pushing socket connected to server at port 5001
-	server_snd, _ := context.NewSocket(zmt.PUSH)
+	server_snd, _ := context.NewSocket(zmq.PUSH)
 	server_snd.SetLinger(time.Second) // Linger for 1 sec
 	defer server_snd.Close()
 	err := server_snd.Connect(fmt.Sprintf("tcp://%s:5001", SERVER_IP))
@@ -91,7 +90,6 @@ func User(user_id int, total_users int, message_count int) {
 	fmt.Printf("\nSend started for %d, reciver ready count is: %d", user_id, reciever_ready)
 	for i := 0; i < message_count; i++ {
 		for target_user := 0; target_user < total_users; target_user++ {
-			// time.Sleep(time.Millisecond)
 			if target_user == user_id {
 				continue
 			}
