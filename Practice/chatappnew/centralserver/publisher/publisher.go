@@ -21,21 +21,24 @@ func StartPublisher(zmqContext *zmq.Context, sharedMsgBuffer chan string, wg *sy
 	publisher.Bind("tcp://*:5002")
 
 	for {
+
 		if globals.GlobalShutdown {
+
 			publisher.Close()
 
 			wg.Done()
 			fmt.Println("Returning for publisher")
 			return
 		}
+
 		message := <-sharedMsgBuffer
+
 		if message == "" {
 			continue
 		}
 
 		publishMessage := processMessage(message)
 
-		fmt.Println("Publish message: ", publishMessage)
 		_, errSnd := publisher.Send(publishMessage, 0)
 		if errSnd != nil {
 			fmt.Println(errSnd)

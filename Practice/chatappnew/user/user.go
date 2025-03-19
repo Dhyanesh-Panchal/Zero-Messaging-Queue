@@ -34,9 +34,11 @@ func main() {
 	fmt.Println("termination called!")
 
 	// call context termination
-	zmqContext.Term()
+	err = zmqContext.Term()
+	if err != nil {
+		panic(err)
+	}
 
 	// wait for all routines to return.
 	wg.Wait()
-
 }

@@ -17,10 +17,12 @@ func StartMessageReciever(zmqContext *zmq.Context, selfName string, wg *sync.Wai
 	for {
 		if globals.GlobalShutdown {
 			subscriber.Close()
+			fmt.Println("Shutting down Subscriber")
 			return
 		}
 		message, err := subscriber.Recv(0)
 		if err != nil {
+			fmt.Println("Error receiving message:", err)
 			continue
 		}
 		handleRecievedMessage(message, selfName)
